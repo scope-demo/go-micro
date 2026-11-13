@@ -2,10 +2,9 @@ package env
 
 import (
 	"context"
-
 	"strings"
 
-	"github.com/asim/go-micro/v3/config/source"
+	"go-micro.dev/v6/config/source"
 )
 
 type strippedPrefixKey struct{}

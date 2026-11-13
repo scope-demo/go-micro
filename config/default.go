@@ -2,32 +2,34 @@ package config
 
 import (
 	"bytes"
+	"fmt"
+	"go-micro.dev/v6/config/loader"
+	"go-micro.dev/v6/config/loader/memory"
+	"go-micro.dev/v6/config/reader"
+	"go-micro.dev/v6/config/reader/json"
+	"go-micro.dev/v6/config/source"
 	"sync"
 	"time"
-
-	"github.com/asim/go-micro/v3/config/loader"
-	"github.com/asim/go-micro/v3/config/loader/memory"
-	"github.com/asim/go-micro/v3/config/reader"
-	"github.com/asim/go-micro/v3/config/reader/json"
-	"github.com/asim/go-micro/v3/config/source"
 )
 
 type config struct {
-	exit chan bool
+	// the current values
+	vals    reader.Values
+	exit    chan bool
+	closeMu sync.Mutex
+	closed  bool
+	// the current snapshot
+	snap *loader.Snapshot
 	opts Options
 
 	sync.RWMutex
-	// the current snapshot
-	snap *loader.Snapshot
-	// the current values
-	vals reader.Values
 }
 
 type watcher struct {
 	lw    loader.Watcher
 	rd    reader.Reader
-	path  []string
 	value reader.Value
+	path  []string
 }
 
 func newConfig(opts ...Option) (Config, error) {
@@ -37,8 +39,9 @@ func newConfig(opts ...Option) (Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	go c.run()
-
+	if !c.opts.WithWatcherDisabled {
+		go c.run()
+	}
 	return &c, nil
 }
 
@@ -47,13 +50,21 @@ func (c *config) Init(opts ...Option) error {
 		Reader: json.NewReader(),
 	}
 	c.exit = make(chan bool)
+	c.closeMu.Lock()
+	c.closed = false
+	c.closeMu.Unlock()
 	for _, o := range opts {
 		o(&c.opts)
 	}
 
 	// default loader uses the configured reader
 	if c.opts.Loader == nil {
-		c.opts.Loader = memory.NewLoader(memory.WithReader(c.opts.Reader))
+		loaderOpts := []loader.Option{memory.WithReader(c.opts.Reader)}
+		if c.opts.WithWatcherDisabled {
+			loaderOpts = append(loaderOpts, memory.WithWatcherDisabled())
+		}
+
+		c.opts.Loader = memory.NewLoader(loaderOpts...)
 	}
 
 	err := c.opts.Loader.Load(c.opts.Source...)
@@ -119,7 +130,8 @@ func (c *config) run() {
 			case <-done:
 			case <-c.exit:
 			}
-			w.Stop()
+			err := w.Stop()
+			fmt.Println(err)
 		}()
 
 		// block watch
@@ -152,7 +164,7 @@ func (c *config) Scan(v interface{}) error {
 	return c.vals.Scan(v)
 }
 
-// sync loads all the sources, calls the parser and updates the config
+// sync loads all the sources, calls the parser and updates the config.
 func (c *config) Sync() error {
 	if err := c.opts.Loader.Sync(); err != nil {
 		return err
@@ -177,16 +189,19 @@ func (c *config) Sync() error {
 }
 
 func (c *config) Close() error {
-	select {
-	case <-c.exit:
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+
+	if c.closed {
 		return nil
-	default:
-		close(c.exit)
 	}
-	return nil
+
+	close(c.exit)
+	c.closed = true
+	return c.opts.Loader.Close()
 }
 
-func (c *config) Get(path ...string) reader.Value {
+func (c *config) Get(path ...string) (reader.Value, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -196,7 +211,7 @@ func (c *config) Get(path ...string) reader.Value {
 	}
 
 	// no value
-	return newValue()
+	return newValue(), nil
 }
 
 func (c *config) Set(val interface{}, path ...string) {
@@ -206,8 +221,6 @@ func (c *config) Set(val interface{}, path ...string) {
 	if c.vals != nil {
 		c.vals.Set(val, path...)
 	}
-
-	return
 }
 
 func (c *config) Del(path ...string) {
@@ -217,8 +230,6 @@ func (c *config) Del(path ...string) {
 	if c.vals != nil {
 		c.vals.Del(path...)
 	}
-
-	return
 }
 
 func (c *config) Bytes() []byte {
@@ -233,6 +244,9 @@ func (c *config) Bytes() []byte {
 }
 
 func (c *config) Load(sources ...source.Source) error {
+	c.Lock()
+	defer c.Unlock()
+
 	if err := c.opts.Loader.Load(sources...); err != nil {
 		return err
 	}
@@ -241,9 +255,6 @@ func (c *config) Load(sources ...source.Source) error {
 	if err != nil {
 		return err
 	}
-
-	c.Lock()
-	defer c.Unlock()
 
 	c.snap = snap
 	vals, err := c.opts.Reader.Values(snap.ChangeSet)
@@ -256,7 +267,10 @@ func (c *config) Load(sources ...source.Source) error {
 }
 
 func (c *config) Watch(path ...string) (Watcher, error) {
-	value := c.Get(path...)
+	value, err := c.Get(path...)
+	if err != nil {
+		return nil, err
+	}
 
 	w, err := c.opts.Loader.Watch(path...)
 	if err != nil {
@@ -292,8 +306,7 @@ func (w *watcher) Next() (reader.Value, error) {
 			return nil, err
 		}
 
-		w.value = v.Get()
-		return w.value, nil
+		return v.Get()
 	}
 }
 

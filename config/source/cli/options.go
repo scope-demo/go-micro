@@ -3,13 +3,13 @@ package cli
 import (
 	"context"
 
-	"github.com/asim/go-micro/v3/config/source"
-	"github.com/micro/cli/v2"
+	"github.com/urfave/cli/v2"
+	"go-micro.dev/v6/config/source"
 )
 
 type contextKey struct{}
 
-// Context sets the cli context
+// Context sets the cli context.
 func Context(c *cli.Context) source.Option {
 	return func(o *source.Options) {
 		if o.Context == nil {

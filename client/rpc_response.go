@@ -1,15 +1,15 @@
 package client
 
 import (
-	"github.com/asim/go-micro/v3/codec"
-	"github.com/asim/go-micro/v3/transport"
+	"go-micro.dev/v6/codec"
+	"go-micro.dev/v6/transport"
 )
 
 type rpcResponse struct {
-	header map[string]string
-	body   []byte
 	socket transport.Socket
 	codec  codec.Codec
+	header map[string]string
+	body   []byte
 }
 
 func (r *rpcResponse) Codec() codec.Reader {

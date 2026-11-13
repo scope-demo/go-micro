@@ -3,7 +3,7 @@ package micro
 import (
 	"context"
 
-	"github.com/asim/go-micro/v3/client"
+	"go-micro.dev/v6/client"
 )
 
 type event struct {

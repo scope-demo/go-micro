@@ -3,7 +3,7 @@ package flag
 import (
 	"context"
 
-	"github.com/asim/go-micro/v3/config/source"
+	"go-micro.dev/v6/config/source"
 )
 
 type includeUnsetKey struct{}

@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/asim/go-micro/v3/util/ring"
 	"github.com/google/uuid"
+	"go-micro.dev/v6/internal/util/ring"
 )
 
 type memTracer struct {
-	opts Options
 
 	// ring buffer of traces
 	buffer *ring.Buffer
+	opts   Options
 }
 
 func (t *memTracer) Read(opts ...ReadOption) ([]*Span, error) {

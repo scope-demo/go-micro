@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/asim/go-micro/v3/debug/log"
+	"go-micro.dev/v6/debug/log"
 )
 
 func TestLogger(t *testing.T) {

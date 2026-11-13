@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/asim/go-micro/v3/config/secrets"
+	"go-micro.dev/v6/config/secrets"
 	naclbox "golang.org/x/crypto/nacl/box"
 )
 
@@ -30,14 +30,14 @@ func TestBox(t *testing.T) {
 	}
 	aliceSecret := []byte("Why is a raven like a writing-desk?")
 	if _, err := alice.Encrypt(aliceSecret); err == nil {
-		t.Error("alice.Encrypt succeded without a public key")
+		t.Error("alice.Encrypt succeeded without a public key")
 	}
 	enc, err := alice.Encrypt(aliceSecret, secrets.RecipientPublicKey(bob.Options().PublicKey))
 	if err != nil {
 		t.Error("alice.Encrypt failed")
 	}
 	if _, err := bob.Decrypt(enc); err == nil {
-		t.Error("bob.Decrypt succeded without a public key")
+		t.Error("bob.Decrypt succeeded without a public key")
 	}
 	if dec, err := bob.Decrypt(enc, secrets.SenderPublicKey(alice.Options().PublicKey)); err == nil {
 		if !reflect.DeepEqual(dec, aliceSecret) {
@@ -52,11 +52,11 @@ func TestBox(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dec, err := alice.Decrypt(enc, secrets.SenderPublicKey(bob.Options().PrivateKey))
+	_, err = alice.Decrypt(enc, secrets.SenderPublicKey(bob.Options().PrivateKey))
 	if err == nil {
 		t.Error(err)
 	}
-	dec, err = alice.Decrypt(enc, secrets.SenderPublicKey(bob.Options().PublicKey))
+	dec, err := alice.Decrypt(enc, secrets.SenderPublicKey(bob.Options().PublicKey))
 	if err != nil {
 		t.Error(err)
 	}

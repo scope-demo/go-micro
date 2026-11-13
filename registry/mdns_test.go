@@ -52,6 +52,19 @@ func TestMDNS(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:    "test4",
+			Version: "1.0.4",
+			Nodes: []*Node{
+				{
+					Id:      "test4-1",
+					Address: "[::]:10004",
+					Metadata: map[string]string{
+						"foo4": "bar4",
+					},
+				},
+			},
+		},
 	}
 
 	travis := os.Getenv("TRAVIS")
@@ -63,7 +76,7 @@ func TestMDNS(t *testing.T) {
 	}
 
 	// new registry
-	r := NewRegistry(opts...)
+	r := NewMDNSRegistry(opts...)
 
 	for _, service := range testData {
 		// register service
@@ -79,7 +92,6 @@ func TestMDNS(t *testing.T) {
 
 		if len(s) != 1 {
 			t.Fatalf("Expected one result for %s got %d", service.Name, len(s))
-
 		}
 
 		if s[0].Name != service.Name {
@@ -135,7 +147,6 @@ func TestMDNS(t *testing.T) {
 			t.Fatalf("Expected nothing got %+v", s[0])
 		}
 	}
-
 }
 
 func TestEncoding(t *testing.T) {
@@ -195,7 +206,6 @@ func TestEncoding(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestWatcher(t *testing.T) {
@@ -243,12 +253,24 @@ func TestWatcher(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:    "test4",
+			Version: "1.0.4",
+			Nodes: []*Node{
+				{
+					Id:      "test4-1",
+					Address: "[::]:10004",
+					Metadata: map[string]string{
+						"foo4": "bar4",
+					},
+				},
+			},
+		},
 	}
 
 	testFn := func(service, s *Service) {
 		if s == nil {
 			t.Fatalf("Expected one result for %s got nil", service.Name)
-
 		}
 
 		if s.Name != service.Name {
@@ -283,7 +305,7 @@ func TestWatcher(t *testing.T) {
 	}
 
 	// new registry
-	r := NewRegistry(opts...)
+	r := NewMDNSRegistry(opts...)
 
 	w, err := r.Watch()
 	if err != nil {

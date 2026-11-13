@@ -3,7 +3,7 @@ package web
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/asim/go-micro/v3/registry"
+	"go-micro.dev/v6/registry"
 )
 
 func TestService(t *testing.T) {
@@ -80,7 +80,7 @@ func TestService(t *testing.T) {
 	}
 	defer rsp.Body.Close()
 
-	b, err := ioutil.ReadAll(rsp.Body)
+	b, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("service.Run():%v", err)
 		}
-	case <-time.After(time.Duration(time.Second)):
+	case <-time.After(time.Second):
 		if len(os.Getenv("IN_TRAVIS_CI")) == 0 {
 			t.Logf("service.Run() survived a client request without an error")
 		}
@@ -130,7 +130,7 @@ func TestService(t *testing.T) {
 				t.Log("service.Run() nil return on syscall.SIGTERM")
 			}
 		}
-	case <-time.After(time.Duration(time.Second)):
+	case <-time.After(time.Second):
 		if len(os.Getenv("IN_TRAVIS_CI")) == 0 {
 			t.Logf("service.Run() survived a client request without an error")
 		}
@@ -154,7 +154,6 @@ func TestService(t *testing.T) {
 			t.Errorf("unexpected %s: want true, have false", tt.subject)
 		}
 	}
-
 }
 
 func TestOptions(t *testing.T) {
@@ -276,7 +275,7 @@ func TestTLS(t *testing.T) {
 	}
 	defer rsp.Body.Close()
 
-	b, err := ioutil.ReadAll(rsp.Body)
+	b, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,10 +289,9 @@ func TestTLS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("service.Run():%v", err)
 		}
-	case <-time.After(time.Duration(time.Second)):
+	case <-time.After(time.Second):
 		if len(os.Getenv("IN_TRAVIS_CI")) == 0 {
 			t.Logf("service.Run() survived a client request without an error")
 		}
 	}
-
 }

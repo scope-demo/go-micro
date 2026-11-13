@@ -5,16 +5,14 @@ package greeter
 
 import (
 	fmt "fmt"
-	_ "google.golang.org/genproto/googleapis/api/annotations"
 	proto "google.golang.org/protobuf/proto"
 	math "math"
 )
 
 import (
 	context "context"
-	api "github.com/asim/go-micro/v3/api"
-	client "github.com/asim/go-micro/v3/client"
-	server "github.com/asim/go-micro/v3/server"
+	client "go-micro.dev/v6/client"
+	server "go-micro.dev/v6/server"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -23,31 +21,9 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ api.Endpoint
 var _ context.Context
 var _ client.Option
 var _ server.Option
-
-// Api Endpoints for Greeter service
-
-func NewGreeterEndpoints() []*api.Endpoint {
-	return []*api.Endpoint{
-		{
-			Name:    "Greeter.Hello",
-			Path:    []string{"/hello"},
-			Method:  []string{"POST"},
-			Body:    "*",
-			Handler: "rpc",
-		},
-		{
-			Name:    "Greeter.Stream",
-			Path:    []string{"/stream"},
-			Method:  []string{"GET"},
-			Stream:  true,
-			Handler: "rpc",
-		},
-	}
-}
 
 // Client API for Greeter service
 
@@ -91,6 +67,7 @@ type Greeter_StreamService interface {
 	Context() context.Context
 	SendMsg(interface{}) error
 	RecvMsg(interface{}) error
+	CloseSend() error
 	Close() error
 	Send(*Request) error
 	Recv() (*Response, error)
@@ -98,6 +75,10 @@ type Greeter_StreamService interface {
 
 type greeterServiceStream struct {
 	stream client.Stream
+}
+
+func (x *greeterServiceStream) CloseSend() error {
+	return x.stream.CloseSend()
 }
 
 func (x *greeterServiceStream) Close() error {
@@ -145,20 +126,6 @@ func RegisterGreeterHandler(s server.Server, hdlr GreeterHandler, opts ...server
 		greeter
 	}
 	h := &greeterHandler{hdlr}
-	opts = append(opts, api.WithEndpoint(&api.Endpoint{
-		Name:    "Greeter.Hello",
-		Path:    []string{"/hello"},
-		Method:  []string{"POST"},
-		Body:    "*",
-		Handler: "rpc",
-	}))
-	opts = append(opts, api.WithEndpoint(&api.Endpoint{
-		Name:    "Greeter.Stream",
-		Path:    []string{"/stream"},
-		Method:  []string{"GET"},
-		Stream:  true,
-		Handler: "rpc",
-	}))
 	return s.Handle(s.NewHandler(&Greeter{h}, opts...))
 }
 

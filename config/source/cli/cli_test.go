@@ -5,38 +5,65 @@ import (
 	"os"
 	"testing"
 
-	"github.com/asim/go-micro/v3"
-	"github.com/asim/go-micro/v3/cmd"
-	"github.com/asim/go-micro/v3/config"
-	"github.com/asim/go-micro/v3/config/source"
-	"github.com/micro/cli/v2"
+	"github.com/urfave/cli/v2"
+	"go-micro.dev/v6"
+	"go-micro.dev/v6/cmd"
+	"go-micro.dev/v6/config"
+	"go-micro.dev/v6/config/source"
 )
 
 func TestCliSourceDefault(t *testing.T) {
 	const expVal string = "flagvalue"
 
-	service := micro.NewService(
-		micro.Flags(
-			// to be able to run inside go test
-			&cli.StringFlag{
-				Name: "test.timeout",
-			},
-			&cli.BoolFlag{
-				Name: "test.v",
-			},
-			&cli.StringFlag{
-				Name: "test.run",
-			},
-			&cli.StringFlag{
-				Name: "test.testlogfile",
-			},
-			&cli.StringFlag{
-				Name:    "flag",
-				Usage:   "It changes something",
-				EnvVars: []string{"flag"},
-				Value:   expVal,
-			},
-		),
+	service := micro.NewService("test", micro.Flags(
+		// to be able to run inside go test
+		&cli.StringFlag{
+			Name: "test.timeout",
+		},
+		&cli.StringFlag{
+			Name: "test.bench",
+		},
+		&cli.BoolFlag{
+			Name: "test.v",
+		},
+		&cli.StringFlag{
+			Name: "test.run",
+		},
+		&cli.StringFlag{
+			Name: "test.testlogfile",
+		},
+		&cli.StringFlag{
+			Name: "test.paniconexit0",
+		},
+		// ponytail: go test injects these into os.Args; accept to run inside go test
+		&cli.StringFlag{
+			Name: "test.count",
+		},
+		&cli.StringFlag{
+			Name: "test.cpu",
+		},
+		&cli.StringFlag{
+			Name: "test.benchtime",
+		},
+		&cli.StringFlag{
+			Name: "test.coverprofile",
+		},
+		&cli.StringFlag{
+			Name: "test.outputdir",
+		},
+		&cli.StringFlag{
+			Name: "test.shuffle",
+		},
+		&cli.StringFlag{
+			Name: "test.failfast",
+		},
+		&cli.StringFlag{
+			Name:    "flag",
+			Usage:   "It changes something",
+			EnvVars: []string{"flag"},
+			Value:   expVal,
+		},
+	),
 	)
 	var cliSrc source.Source
 	service.Init(
@@ -50,7 +77,9 @@ func TestCliSourceDefault(t *testing.T) {
 	)
 
 	config.Load(cliSrc)
-	if fval := config.Get("flag").String("default"); fval != expVal {
+	if val, err := config.Get("flag"); err != nil {
+		t.Fatal(err)
+	} else if fval := val.String("default"); fval != expVal {
 		t.Fatalf("default flag value not loaded %v != %v", fval, expVal)
 	}
 }
@@ -101,7 +130,6 @@ func test(t *testing.T, withContext bool) {
 	if actualDB["host"] != "localhost" {
 		t.Errorf("expected localhost, got %v", actualDB["name"])
 	}
-
 }
 
 func TestCliSource(t *testing.T) {

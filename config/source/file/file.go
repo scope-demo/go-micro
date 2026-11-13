@@ -2,15 +2,17 @@
 package file
 
 import (
-	"io/ioutil"
+	"io"
+	"io/fs"
 	"os"
 
-	"github.com/asim/go-micro/v3/config/source"
+	"go-micro.dev/v6/config/source"
 )
 
 type file struct {
-	path string
 	opts source.Options
+	fs   fs.FS
+	path string
 }
 
 var (
@@ -18,12 +20,20 @@ var (
 )
 
 func (f *file) Read() (*source.ChangeSet, error) {
-	fh, err := os.Open(f.path)
+	var fh fs.File
+	var err error
+
+	if f.fs != nil {
+		fh, err = f.fs.Open(f.path)
+	} else {
+		fh, err = os.Open(f.path)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	defer fh.Close()
-	b, err := ioutil.ReadAll(fh)
+	b, err := io.ReadAll(fh)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +58,11 @@ func (f *file) String() string {
 }
 
 func (f *file) Watch() (source.Watcher, error) {
+	// do not watch if fs.FS instance is provided
+	if f.fs != nil {
+		return source.NewNoopWatcher()
+	}
+
 	if _, err := os.Stat(f.path); err != nil {
 		return nil, err
 	}
@@ -60,10 +75,13 @@ func (f *file) Write(cs *source.ChangeSet) error {
 
 func NewSource(opts ...source.Option) source.Source {
 	options := source.NewOptions(opts...)
+
+	fs, _ := options.Context.Value(fsKey{}).(fs.FS)
+
 	path := DefaultPath
 	f, ok := options.Context.Value(filePathKey{}).(string)
 	if ok {
 		path = f
 	}
-	return &file{opts: options, path: path}
+	return &file{opts: options, fs: fs, path: path}
 }

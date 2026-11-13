@@ -8,19 +8,19 @@ import (
 	"runtime/pprof"
 	"sync"
 
-	"github.com/asim/go-micro/v3/debug/profile"
+	"go-micro.dev/v6/debug/profile"
 )
 
 type profiler struct {
-	opts profile.Options
-
-	sync.Mutex
-	running bool
 
 	// where the cpu profile is written
 	cpuFile *os.File
 	// where the mem profile is written
 	memFile *os.File
+	opts    profile.Options
+
+	sync.Mutex
+	running bool
 }
 
 func (p *profiler) Start() error {
@@ -75,7 +75,7 @@ func (p *profiler) Stop() error {
 	pprof.StopCPUProfile()
 	p.cpuFile.Close()
 	runtime.GC()
-	pprof.WriteHeapProfile(p.memFile)
+	_ = pprof.WriteHeapProfile(p.memFile)
 	p.memFile.Close()
 	p.running = false
 	p.cpuFile = nil

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/asim/go-micro/v3/codec"
+	"go-micro.dev/v6/codec"
 )
 
 type serverCodec struct {
@@ -14,14 +14,13 @@ type serverCodec struct {
 	c   io.Closer
 
 	// temporary work space
-	req  serverRequest
-	resp serverResponse
+	req serverRequest
 }
 
 type serverRequest struct {
-	Method string           `json:"method"`
-	Params *json.RawMessage `json:"params"`
 	ID     interface{}      `json:"id"`
+	Params *json.RawMessage `json:"params"`
+	Method string           `json:"method"`
 }
 
 type serverResponse struct {
@@ -67,8 +66,6 @@ func (c *serverCodec) ReadBody(x interface{}) error {
 	params[0] = x
 	return json.Unmarshal(*c.req.Params, &params)
 }
-
-var null = json.RawMessage([]byte("null"))
 
 func (c *serverCodec) Write(m *codec.Message, x interface{}) error {
 	var resp serverResponse

@@ -6,18 +6,18 @@ import (
 	"io"
 	"sync"
 
-	"github.com/asim/go-micro/v3/codec"
+	"go-micro.dev/v6/codec"
 )
 
-// Implements the Streamer interface
+// Implements the Streamer interface.
 type rpcStream struct {
-	sync.RWMutex
-	id      string
-	closed  bool
 	err     error
 	request Request
 	codec   codec.Codec
 	context context.Context
+	id      string
+	sync.RWMutex
+	closed bool
 }
 
 func (r *rpcStream) Context() context.Context {
@@ -42,6 +42,7 @@ func (r *rpcStream) Send(msg interface{}) error {
 
 	if err := r.codec.Write(&resp, msg); err != nil {
 		r.err = err
+		return err
 	}
 
 	return nil
@@ -56,7 +57,7 @@ func (r *rpcStream) Recv(msg interface{}) error {
 	defer r.Unlock()
 	if err != nil {
 		// discard body
-		r.codec.ReadBody(nil)
+		_ = r.codec.ReadBody(nil)
 		r.err = err
 		return err
 	}
@@ -65,10 +66,10 @@ func (r *rpcStream) Recv(msg interface{}) error {
 	if len(req.Error) > 0 {
 		// Check the client closed the stream
 		switch req.Error {
-		case lastStreamResponseError.Error():
+		case errLastStreamResponse.Error():
 			// discard body
 			r.Unlock()
-			r.codec.ReadBody(nil)
+			_ = r.codec.ReadBody(nil)
 			r.Lock()
 			r.err = io.EOF
 			return io.EOF

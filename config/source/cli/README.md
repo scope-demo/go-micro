@@ -4,7 +4,7 @@ The cli source reads config from parsed flags via a cli.Context.
 
 ## Format
 
-We expect the use of the `micro/cli` package. Upper case flags will be lower cased. Dashes will be used as delimiters for nesting.
+We expect the use of the `urfave/cli` package. Upper case flags will be lower cased. Dashes will be used as delimiters for nesting.
 
 ### Example
 
@@ -27,10 +27,10 @@ Becomes
 
 ```json
 {
-    "database": {
-        "address": "127.0.0.1",
-        "port": 3306
-    }
+  "database": {
+    "address": "127.0.0.1",
+    "port": 3306
+  }
 }
 ```
 
@@ -63,7 +63,7 @@ func main() {
             // Alternatively, just setup your config right here
         }),
     )
-    
+
     // ... Load and use that source ...
     conf := config.NewConfig()
     conf.Load(clisrc)

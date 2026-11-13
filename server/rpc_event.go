@@ -1,11 +1,12 @@
 package server
 
 import (
-	"github.com/asim/go-micro/v3/broker"
-	"github.com/asim/go-micro/v3/transport"
+	"go-micro.dev/v6/broker"
+	"go-micro.dev/v6/transport"
+	"go-micro.dev/v6/transport/headers"
 )
 
-// event is a broker event we handle on the server transport
+// event is a broker event we handle on the server transport.
 type event struct {
 	err     error
 	message *broker.Message
@@ -25,7 +26,7 @@ func (e *event) Error() error {
 }
 
 func (e *event) Topic() string {
-	return e.message.Header["Micro-Topic"]
+	return e.message.Header[headers.Message]
 }
 
 func newEvent(msg transport.Message) *event {

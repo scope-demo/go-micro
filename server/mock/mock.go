@@ -4,16 +4,16 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/asim/go-micro/v3/server"
 	"github.com/google/uuid"
+	"go-micro.dev/v6/server"
 )
 
 type MockServer struct {
-	sync.Mutex
-	Running     bool
 	Opts        server.Options
 	Handlers    map[string]server.Handler
 	Subscribers map[string][]server.Subscriber
+	sync.Mutex
+	Running bool
 }
 
 var (

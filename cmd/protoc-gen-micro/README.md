@@ -5,7 +5,7 @@ This is protobuf code generation for go-micro. We use protoc-gen-micro to reduce
 ## Install
 
 ```
-go get github.com/asim/go-micro/cmd/protoc-gen-micro/v3
+go install go-micro.dev/v5/cmd/protoc-gen-micro@v5.16.0
 ```
 
 Also required: 
@@ -19,6 +19,9 @@ Define your service as `greeter.proto`
 
 ```
 syntax = "proto3";
+
+package greeter;
+option go_package = "/proto;greeter";
 
 service Greeter {
 	rpc Hello(Request) returns (Response) {}
@@ -36,7 +39,7 @@ message Response {
 Generate the code
 
 ```
-protoc --proto_path=$GOPATH/src:. --micro_out=. --go_out=. greeter.proto
+protoc --proto_path=. --micro_out=. --go_out=. greeter.proto
 ```
 
 Your output result should be:
@@ -80,7 +83,7 @@ If you see an error about `protoc-gen-micro` not being found or executable, it's
 Alternative specify the Go plugin paths as arguments to the `protoc` command
 
 ```
-protoc --plugin=protoc-gen-go=$GOPATH/bin/protoc-gen-go --plugin=protoc-gen-micro=$GOPATH/bin/protoc-gen-micro --proto_path=$GOPATH/src:. --micro_out=. --go_out=. greeter.proto
+protoc --plugin=protoc-gen-go=$GOPATH/bin/protoc-gen-go --plugin=protoc-gen-micro=$GOPATH/bin/protoc-gen-micro --proto_path=. --micro_out=. --go_out=. greeter.proto
 ```
 
 ### Endpoint
@@ -94,6 +97,9 @@ Usage:
 
 ```diff
 syntax = "proto3";
+
+package greeter;
+option go_package = "/proto;greeter";
 
 import "google/api/annotations.proto";
 
@@ -112,7 +118,7 @@ message Response {
 }
 ```
 
-The proto generates a `RegisterGreeterHandler` function with a [api.Endpoint](https://godoc.org/github.com/asim/go-micro/v3/api#Endpoint). 
+The proto generates a `RegisterGreeterHandler` function with a [api.Endpoint](https://godoc.org/go-micro.dev/v3/api#Endpoint). 
 
 ```diff
 func RegisterGreeterHandler(s server.Server, hdlr GreeterHandler, opts ...server.HandlerOption) error {
@@ -136,3 +142,12 @@ func RegisterGreeterHandler(s server.Server, hdlr GreeterHandler, opts ...server
 ## LICENSE
 
 protoc-gen-micro is a liberal reuse of protoc-gen-go hence we maintain the original license 
+
+## Protobuf responses over JSON
+
+Generated message fields come from `protoc-gen-go` and commonly carry
+`omitempty`. If clients need explicit zero counts, `false`, or empty lists,
+configure the response codec's protobuf JSON options. See
+[JSON output options](../../codec/json/README.md) for `EmitUnpopulated`,
+`UseProtoNames`, and range-checked numeric 64-bit integers. Protobuf JSON normally
+encodes 64-bit integers as strings; do not change that wire contract implicitly.

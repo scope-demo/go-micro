@@ -1,11 +1,11 @@
 package selector
 
 import (
-	"github.com/asim/go-micro/v3/registry"
+	"go-micro.dev/v6/registry"
 )
 
 var (
-	// mock data
+	// mock data.
 	testData = map[string][]*registry.Service{
 		"foo": {
 			{

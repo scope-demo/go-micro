@@ -2,20 +2,18 @@ package web_test
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/asim/go-micro/v3"
-	"github.com/asim/go-micro/v3/logger"
-	"github.com/asim/go-micro/v3/web"
-	"github.com/micro/cli/v2"
+	"github.com/urfave/cli/v2"
+	"go-micro.dev/v6"
+	"go-micro.dev/v6/logger"
+	"go-micro.dev/v6/web"
 )
 
 func TestWeb(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		fmt.Println("Test nr", i)
 		testFunc()
 	}
 }
@@ -24,9 +22,7 @@ func testFunc() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*250)
 	defer cancel()
 
-	s := micro.NewService(
-		micro.Name("test"),
-		micro.Context(ctx),
+	service := micro.NewService("test", micro.Context(ctx),
 		micro.HandleSignal(false),
 		micro.Flags(
 			&cli.StringFlag{
@@ -44,27 +40,27 @@ func testFunc() {
 		),
 	)
 	w := web.NewService(
-		web.MicroService(s),
+		web.MicroService(service),
 		web.Context(ctx),
 		web.HandleSignal(false),
 	)
-	//s.Init()
-	//w.Init()
+	// s.Init()
+	// w.Init()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := s.Run()
+		err := service.Run()
 		if err != nil {
-			logger.Errorf("micro run error: %v", err)
+			logger.Logf(logger.ErrorLevel, "micro run error: %v", err)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		err := w.Run()
 		if err != nil {
-			logger.Errorf("web run error: %v", err)
+			logger.Logf(logger.ErrorLevel, "web run error: %v", err)
 		}
 	}()
 

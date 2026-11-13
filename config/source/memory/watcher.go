@@ -1,13 +1,13 @@
 package memory
 
 import (
-	"github.com/asim/go-micro/v3/config/source"
+	"go-micro.dev/v6/config/source"
 )
 
 type watcher struct {
-	Id      string
 	Updates chan *source.ChangeSet
 	Source  *memory
+	Id      string
 }
 
 func (w *watcher) Next() (*source.ChangeSet, error) {

@@ -4,21 +4,21 @@ package memory
 import (
 	"fmt"
 
-	"github.com/asim/go-micro/v3/debug/log"
-	"github.com/asim/go-micro/v3/util/ring"
+	"go-micro.dev/v6/debug/log"
+	"go-micro.dev/v6/internal/util/ring"
 )
 
 var (
-	// DefaultSize of the logger buffer
+	// DefaultSize of the logger buffer.
 	DefaultSize = 1024
 )
 
-// memoryLog is default micro log
+// memoryLog is default micro log.
 type memoryLog struct {
 	*ring.Buffer
 }
 
-// NewLog returns default Logger with
+// NewLog returns default Logger with.
 func NewLog(opts ...log.Option) log.Log {
 	// get default options
 	options := log.DefaultOptions()
@@ -33,13 +33,13 @@ func NewLog(opts ...log.Option) log.Log {
 	}
 }
 
-// Write writes logs into logger
+// Write writes logs into logger.
 func (l *memoryLog) Write(r log.Record) error {
-	l.Buffer.Put(fmt.Sprint(r.Message))
+	l.Put(fmt.Sprint(r.Message))
 	return nil
 }
 
-// Read reads logs and returns them
+// Read reads logs and returns them.
 func (l *memoryLog) Read(opts ...log.ReadOption) ([]log.Record, error) {
 	options := log.ReadOptions{}
 	// initialize the read options
@@ -50,7 +50,7 @@ func (l *memoryLog) Read(opts ...log.ReadOption) ([]log.Record, error) {
 	var entries []*ring.Entry
 	// if Since options ha sbeen specified we honor it
 	if !options.Since.IsZero() {
-		entries = l.Buffer.Since(options.Since)
+		entries = l.Since(options.Since)
 	}
 
 	// only if we specified valid count constraint
@@ -66,7 +66,7 @@ func (l *memoryLog) Read(opts ...log.ReadOption) ([]log.Record, error) {
 				entries = entries[0:options.Count]
 			}
 		default:
-			entries = l.Buffer.Get(options.Count)
+			entries = l.Get(options.Count)
 		}
 	}
 
@@ -83,14 +83,14 @@ func (l *memoryLog) Read(opts ...log.ReadOption) ([]log.Record, error) {
 }
 
 // Stream returns channel for reading log records
-// along with a stop channel, close it when done
+// along with a stop channel, close it when done.
 func (l *memoryLog) Stream() (log.Stream, error) {
 	// get stream channel from ring buffer
 	stream, stop := l.Buffer.Stream()
 	// make a buffered channel
 	records := make(chan log.Record, 128)
 	// get last 10 records
-	last10 := l.Buffer.Get(10)
+	last10 := l.Get(10)
 
 	// stream the log records
 	go func() {

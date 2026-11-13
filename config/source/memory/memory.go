@@ -5,14 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/asim/go-micro/v3/config/source"
 	"github.com/google/uuid"
+	"go-micro.dev/v6/config/source"
 )
 
 type memory struct {
-	sync.RWMutex
 	ChangeSet *source.ChangeSet
 	Watchers  map[string]*watcher
+	sync.RWMutex
 }
 
 func (s *memory) Read() (*source.ChangeSet, error) {
@@ -41,8 +41,8 @@ func (s *memory) Watch() (source.Watcher, error) {
 	return w, nil
 }
 
-func (m *memory) Write(cs *source.ChangeSet) error {
-	m.Update(cs)
+func (s *memory) Write(cs *source.ChangeSet) error {
+	s.Update(cs)
 	return nil
 }
 

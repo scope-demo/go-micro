@@ -5,10 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 	"time"
 
-	"github.com/asim/go-micro/v3/config"
-	"github.com/asim/go-micro/v3/config/source/file"
+	"go-micro.dev/v6/config"
+	"go-micro.dev/v6/config/source/file"
 )
 
 func TestConfig(t *testing.T) {
@@ -55,6 +56,28 @@ func TestFile(t *testing.T) {
 	}
 
 	f := file.NewSource(file.WithPath(path))
+	c, err := f.Read()
+	if err != nil {
+		t.Error(err)
+	}
+	if string(c.Data) != string(data) {
+		t.Logf("%+v", c)
+		t.Error("data from file does not match")
+	}
+}
+
+func TestWithFS(t *testing.T) {
+	data := []byte(`{"foo": "bar"}`)
+	path := fmt.Sprintf("file.%d", time.Now().UnixNano())
+
+	fsMock := fstest.MapFS{
+		path: &fstest.MapFile{
+			Data: data,
+			Mode: 0666,
+		},
+	}
+
+	f := file.NewSource(file.WithFS(fsMock), file.WithPath(path))
 	c, err := f.Read()
 	if err != nil {
 		t.Error(err)

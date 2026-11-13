@@ -3,32 +3,35 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
+	"os"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/asim/go-micro/v3/auth"
-	"github.com/asim/go-micro/v3/broker"
-	"github.com/asim/go-micro/v3/client"
-	"github.com/asim/go-micro/v3/config"
-	"github.com/asim/go-micro/v3/debug/profile"
-	"github.com/asim/go-micro/v3/debug/profile/http"
-	"github.com/asim/go-micro/v3/debug/profile/pprof"
-	"github.com/asim/go-micro/v3/debug/trace"
-	"github.com/asim/go-micro/v3/logger"
-	"github.com/asim/go-micro/v3/registry"
-	"github.com/asim/go-micro/v3/runtime"
-	"github.com/asim/go-micro/v3/selector"
-	"github.com/asim/go-micro/v3/server"
-	"github.com/asim/go-micro/v3/store"
-	"github.com/asim/go-micro/v3/transport"
-	"github.com/micro/cli/v2"
+	"github.com/urfave/cli/v2"
+	"go-micro.dev/v6/auth"
+	"go-micro.dev/v6/broker"
+	"go-micro.dev/v6/cache"
+	"go-micro.dev/v6/client"
+	"go-micro.dev/v6/config"
+	"go-micro.dev/v6/debug/profile"
+	"go-micro.dev/v6/debug/profile/http"
+	"go-micro.dev/v6/debug/profile/pprof"
+	"go-micro.dev/v6/debug/trace"
+	"go-micro.dev/v6/events"
+	"go-micro.dev/v6/logger"
+	"go-micro.dev/v6/registry"
+	"go-micro.dev/v6/selector"
+	"go-micro.dev/v6/server"
+	mprofile "go-micro.dev/v6/service/profile"
+	"go-micro.dev/v6/store"
+	"go-micro.dev/v6/transport"
 )
 
 type Cmd interface {
 	// The cli app within this cmd
 	App() *cli.App
-	// Adds options, parses flags and initialise
+	// Adds options, parses flags and initialize
 	// exits on error
 	Init(opts ...Option) error
 	// Options set within this command
@@ -54,7 +57,12 @@ var (
 		&cli.StringFlag{
 			Name:    "client_request_timeout",
 			EnvVars: []string{"MICRO_CLIENT_REQUEST_TIMEOUT"},
-			Usage:   "Sets the client request timeout. e.g 500ms, 5s, 1m. Default: 5s",
+			Usage:   "Sets the client request timeout. e.g 500ms, 5s, 1m. Default: 30s",
+		},
+		&cli.StringFlag{
+			Name:    "client_connection_timeout",
+			EnvVars: []string{"MICRO_CLIENT_CONNECTION_TIMEOUT"},
+			Usage:   "Sets the client connection/request-attempt timeout. Default: 5s",
 		},
 		&cli.IntFlag{
 			Name:    "client_retries",
@@ -132,7 +140,12 @@ var (
 		},
 		&cli.StringFlag{
 			Name:    "profile",
-			Usage:   "Debug profiler for cpu and memory stats",
+			Usage:   "Plugin profile to use. (local, nats, etc)",
+			EnvVars: []string{"MICRO_PROFILE"},
+		},
+		&cli.StringFlag{
+			Name:    "debug-profile",
+			Usage:   "Debug Plugin profile to use.",
 			EnvVars: []string{"MICRO_DEBUG_PROFILE"},
 		},
 		&cli.StringFlag{
@@ -144,17 +157,6 @@ var (
 			Name:    "registry_address",
 			EnvVars: []string{"MICRO_REGISTRY_ADDRESS"},
 			Usage:   "Comma-separated list of registry addresses",
-		},
-		&cli.StringFlag{
-			Name:    "runtime",
-			Usage:   "Runtime for building and running services e.g local, kubernetes",
-			EnvVars: []string{"MICRO_RUNTIME"},
-		},
-		&cli.StringFlag{
-			Name:    "runtime_source",
-			Usage:   "Runtime source for building and running services e.g github.com/micro/service",
-			EnvVars: []string{"MICRO_RUNTIME_SOURCE"},
-			Value:   "github.com/micro/services",
 		},
 		&cli.StringFlag{
 			Name:    "selector",
@@ -239,11 +241,25 @@ var (
 		},
 	}
 
-	DefaultBrokers = map[string]func(...broker.Option) broker.Broker{}
+	// The Default* maps carry only the zero-dependency in-core plugins.
+	// External plugins (NATS, Consul, etcd, RabbitMQ, Redis, Postgres, MySQL,
+	// ...) register themselves into these maps from
+	// go-micro.dev/v6/cmd/defaults — blank-import it (the micro CLI does) to
+	// make every flag value selectable. Keeping them out of this package means
+	// a library binary that supplies its own plugins does not link ~40
+	// packages of infrastructure it never runs.
+
+	DefaultBrokers = map[string]func(...broker.Option) broker.Broker{
+		"memory": broker.NewMemoryBroker,
+		"http":   broker.NewHttpBroker,
+	}
 
 	DefaultClients = map[string]func(...client.Option) client.Client{}
 
-	DefaultRegistries = map[string]func(...registry.Option) registry.Registry{}
+	DefaultRegistries = map[string]func(...registry.Option) registry.Registry{
+		"memory": registry.NewMemoryRegistry,
+		"mdns":   registry.NewMDNSRegistry,
+	}
 
 	DefaultSelectors = map[string]func(...selector.Option) selector.Selector{}
 
@@ -251,53 +267,74 @@ var (
 
 	DefaultTransports = map[string]func(...transport.Option) transport.Transport{}
 
-	DefaultRuntimes = map[string]func(...runtime.Option) runtime.Runtime{}
-
-	DefaultStores = map[string]func(...store.Option) store.Store{}
+	DefaultStores = map[string]func(...store.Option) store.Store{
+		"memory": store.NewMemoryStore,
+	}
 
 	DefaultTracers = map[string]func(...trace.Option) trace.Tracer{}
 
 	DefaultAuths = map[string]func(...auth.Option) auth.Auth{}
 
-	DefaultProfiles = map[string]func(...profile.Option) profile.Profile{
+	DefaultDebugProfiles = map[string]func(...profile.Option) profile.Profile{
 		"http":  http.NewProfile,
 		"pprof": pprof.NewProfile,
 	}
 
 	DefaultConfigs = map[string]func(...config.Option) (config.Config, error){}
+
+	DefaultCaches = map[string]func(...cache.Option) cache.Cache{}
+
+	DefaultStreams = map[string]func(...events.Option) (events.Stream, error){}
 )
 
 func init() {
-	rand.Seed(time.Now().Unix())
 }
 
 func newCmd(opts ...Option) Cmd {
-	options := Options{
-		Auth:      &auth.DefaultAuth,
-		Broker:    &broker.DefaultBroker,
-		Client:    &client.DefaultClient,
-		Registry:  &registry.DefaultRegistry,
-		Server:    &server.DefaultServer,
-		Selector:  &selector.DefaultSelector,
-		Transport: &transport.DefaultTransport,
-		Runtime:   &runtime.DefaultRuntime,
-		Store:     &store.DefaultStore,
-		Tracer:    &trace.DefaultTracer,
-		Profile:   &profile.DefaultProfile,
-		Config:    &config.DefaultConfig,
+	// Create local copies so each cmd instance is isolated.
+	// This allows multiple services in a single binary without
+	// conflicting through shared global pointers.
+	localAuth := auth.DefaultAuth
+	localBroker := broker.DefaultBroker
+	localClient := client.DefaultClient
+	localRegistry := registry.DefaultRegistry
+	localServer := server.DefaultServer
+	localSelector := selector.DefaultSelector
+	localTransport := transport.DefaultTransport
+	localStore := store.DefaultStore
+	localTracer := trace.DefaultTracer
+	localProfile := profile.DefaultProfile
+	localConfig := config.DefaultConfig
+	localCache := cache.DefaultCache
+	localStream := events.DefaultStream
 
-		Brokers:    DefaultBrokers,
-		Clients:    DefaultClients,
-		Registries: DefaultRegistries,
-		Selectors:  DefaultSelectors,
-		Servers:    DefaultServers,
-		Transports: DefaultTransports,
-		Runtimes:   DefaultRuntimes,
-		Stores:     DefaultStores,
-		Tracers:    DefaultTracers,
-		Auths:      DefaultAuths,
-		Profiles:   DefaultProfiles,
-		Configs:    DefaultConfigs,
+	options := Options{
+		Auth:         &localAuth,
+		Broker:       &localBroker,
+		Client:       &localClient,
+		Registry:     &localRegistry,
+		Server:       &localServer,
+		Selector:     &localSelector,
+		Transport:    &localTransport,
+		Store:        &localStore,
+		Tracer:       &localTracer,
+		DebugProfile: &localProfile,
+		Config:       &localConfig,
+		Cache:        &localCache,
+		Stream:       &localStream,
+
+		Brokers:       DefaultBrokers,
+		Clients:       DefaultClients,
+		Registries:    DefaultRegistries,
+		Selectors:     DefaultSelectors,
+		Servers:       DefaultServers,
+		Transports:    DefaultTransports,
+		Stores:        DefaultStores,
+		Tracers:       DefaultTracers,
+		Auths:         DefaultAuths,
+		DebugProfiles: DefaultDebugProfiles,
+		Configs:       DefaultConfigs,
+		Caches:        DefaultCaches,
 	}
 
 	for _, o := range opts {
@@ -339,7 +376,57 @@ func (c *cmd) Before(ctx *cli.Context) error {
 	// If flags are set then use them otherwise do nothing
 	var serverOpts []server.Option
 	var clientOpts []client.Option
+	// --- Profile Grouping Extension ---
 
+	profileName := ctx.String("profile")
+	if profileName == "" {
+		profileName = os.Getenv("MICRO_PROFILE")
+	}
+	if profileName != "" {
+		switch profileName {
+		case "local":
+			imported, ierr := mprofile.LocalProfile()
+			if ierr != nil {
+				return fmt.Errorf("failed to load local profile: %v", ierr)
+			}
+			*c.opts.Registry = imported.Registry
+			*c.opts.Broker = imported.Broker
+			*c.opts.Store = imported.Store
+			*c.opts.Transport = imported.Transport
+		default:
+			// Plugin-backed profiles (e.g. nats) register themselves from their
+			// own package — linked via go-micro.dev/v6/cmd/defaults or a direct
+			// import — so binaries that never select them do not carry them.
+			imported, ierr := mprofile.Load(profileName)
+			if ierr != nil {
+				return fmt.Errorf("failed to load %s profile: %v", profileName, ierr)
+			}
+			// Set the registry
+			sopts, clopts := c.setRegistry(imported.Registry)
+			serverOpts = append(serverOpts, sopts...)
+			clientOpts = append(clientOpts, clopts...)
+
+			// set the store
+			sopts, clopts = c.setStore(imported.Store)
+			serverOpts = append(serverOpts, sopts...)
+			clientOpts = append(clientOpts, clopts...)
+
+			// set the transport
+			sopts, clopts = c.setTransport(imported.Transport)
+			serverOpts = append(serverOpts, sopts...)
+			clientOpts = append(clientOpts, clopts...)
+
+			// Set the broker
+			sopts, clopts = c.setBroker(imported.Broker)
+			serverOpts = append(serverOpts, sopts...)
+			clientOpts = append(clientOpts, clopts...)
+
+			// Set the stream
+			sopts, clopts = c.setStream(imported.Stream)
+			serverOpts = append(serverOpts, sopts...)
+			clientOpts = append(clientOpts, clopts...)
+		}
+	}
 	// Set the client
 	if name := ctx.String("client"); len(name) > 0 {
 		// only change if we have the client and type differs
@@ -360,27 +447,17 @@ func (c *cmd) Before(ctx *cli.Context) error {
 	if name := ctx.String("store"); len(name) > 0 {
 		s, ok := c.opts.Stores[name]
 		if !ok {
-			return fmt.Errorf("Unsupported store: %s", name)
+			return fmt.Errorf("store %q is not linked into this binary: import go-micro.dev/v6/cmd/defaults to enable flag-selected plugins", name)
 		}
 
 		*c.opts.Store = s(store.WithClient(*c.opts.Client))
-	}
-
-	// Set the runtime
-	if name := ctx.String("runtime"); len(name) > 0 {
-		r, ok := c.opts.Runtimes[name]
-		if !ok {
-			return fmt.Errorf("Unsupported runtime: %s", name)
-		}
-
-		*c.opts.Runtime = r(runtime.WithClient(*c.opts.Client))
 	}
 
 	// Set the tracer
 	if name := ctx.String("tracer"); len(name) > 0 {
 		r, ok := c.opts.Tracers[name]
 		if !ok {
-			return fmt.Errorf("Unsupported tracer: %s", name)
+			return fmt.Errorf("unsupported tracer: %s", name)
 		}
 
 		*c.opts.Tracer = r()
@@ -403,49 +480,45 @@ func (c *cmd) Before(ctx *cli.Context) error {
 	if len(ctx.String("auth_namespace")) > 0 {
 		authOpts = append(authOpts, auth.Namespace(ctx.String("auth_namespace")))
 	}
+	if name := ctx.String("auth"); len(name) > 0 {
+		r, ok := c.opts.Auths[name]
+		if !ok {
+			return fmt.Errorf("unsupported auth: %s", name)
+		}
+
+		*c.opts.Auth = r(authOpts...)
+	}
 
 	// Set the registry
 	if name := ctx.String("registry"); len(name) > 0 && (*c.opts.Registry).String() != name {
 		r, ok := c.opts.Registries[name]
 		if !ok {
-			return fmt.Errorf("Registry %s not found", name)
+			return fmt.Errorf("registry %q is not linked into this binary: import go-micro.dev/v6/cmd/defaults to enable flag-selected plugins", name)
 		}
 
-		*c.opts.Registry = r()
-		serverOpts = append(serverOpts, server.Registry(*c.opts.Registry))
-		clientOpts = append(clientOpts, client.Registry(*c.opts.Registry))
-
-		if err := (*c.opts.Selector).Init(selector.Registry(*c.opts.Registry)); err != nil {
-			logger.Fatalf("Error configuring registry: %v", err)
-		}
-
-		clientOpts = append(clientOpts, client.Selector(*c.opts.Selector))
-
-		if err := (*c.opts.Broker).Init(broker.Registry(*c.opts.Registry)); err != nil {
-			logger.Fatalf("Error configuring broker: %v", err)
-		}
+		sopts, clopts := c.setRegistry(r())
+		serverOpts = append(serverOpts, sopts...)
+		clientOpts = append(clientOpts, clopts...)
 	}
 
-	// Set the profile
-	if name := ctx.String("profile"); len(name) > 0 {
-		p, ok := c.opts.Profiles[name]
+	// Set the debug profile
+	if name := ctx.String("debug-profile"); len(name) > 0 {
+		p, ok := c.opts.DebugProfiles[name]
 		if !ok {
-			return fmt.Errorf("Unsupported profile: %s", name)
+			return fmt.Errorf("unsupported profile: %s", name)
 		}
-
-		*c.opts.Profile = p()
+		*c.opts.DebugProfile = p()
 	}
 
 	// Set the broker
 	if name := ctx.String("broker"); len(name) > 0 && (*c.opts.Broker).String() != name {
 		b, ok := c.opts.Brokers[name]
 		if !ok {
-			return fmt.Errorf("Broker %s not found", name)
+			return fmt.Errorf("broker %q is not linked into this binary: import go-micro.dev/v6/cmd/defaults to enable flag-selected plugins", name)
 		}
-
-		*c.opts.Broker = b()
-		serverOpts = append(serverOpts, server.Broker(*c.opts.Broker))
-		clientOpts = append(clientOpts, client.Broker(*c.opts.Broker))
+		sopts, clopts := c.setBroker(b())
+		serverOpts = append(serverOpts, sopts...)
+		clientOpts = append(clientOpts, clopts...)
 	}
 
 	// Set the selector
@@ -465,12 +538,13 @@ func (c *cmd) Before(ctx *cli.Context) error {
 	if name := ctx.String("transport"); len(name) > 0 && (*c.opts.Transport).String() != name {
 		t, ok := c.opts.Transports[name]
 		if !ok {
-			return fmt.Errorf("Transport %s not found", name)
+			return fmt.Errorf("transport %q is not linked into this binary: import go-micro.dev/v6/cmd/defaults to enable flag-selected plugins", name)
 		}
 
-		*c.opts.Transport = t()
-		serverOpts = append(serverOpts, server.Transport(*c.opts.Transport))
-		clientOpts = append(clientOpts, client.Transport(*c.opts.Transport))
+		sopts, clopts := c.setTransport(t())
+		serverOpts = append(serverOpts, sopts...)
+		clientOpts = append(clientOpts, clopts...)
+
 	}
 
 	// Parse the server options
@@ -553,12 +627,6 @@ func (c *cmd) Before(ctx *cli.Context) error {
 		serverOpts = append(serverOpts, server.RegisterInterval(val*time.Second))
 	}
 
-	if len(ctx.String("runtime_source")) > 0 {
-		if err := (*c.opts.Runtime).Init(runtime.WithSource(ctx.String("runtime_source"))); err != nil {
-			logger.Fatalf("Error configuring runtime: %v", err)
-		}
-	}
-
 	// client opts
 	if r := ctx.Int("client_retries"); r >= 0 {
 		clientOpts = append(clientOpts, client.Retries(r))
@@ -572,6 +640,14 @@ func (c *cmd) Before(ctx *cli.Context) error {
 		clientOpts = append(clientOpts, client.RequestTimeout(d))
 	}
 
+	if value := ctx.String("client_connection_timeout"); value != "" {
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("failed to parse client_connection_timeout: %w", err)
+		}
+		clientOpts = append(clientOpts, client.ConnectionTimeout(duration))
+	}
+
 	if r := ctx.Int("client_pool_size"); r > 0 {
 		clientOpts = append(clientOpts, client.PoolSize(r))
 	}
@@ -582,6 +658,14 @@ func (c *cmd) Before(ctx *cli.Context) error {
 			return fmt.Errorf("failed to parse client_pool_ttl: %v", t)
 		}
 		clientOpts = append(clientOpts, client.PoolTTL(d))
+	}
+
+	if t := ctx.String("client_pool_close_timeout"); len(t) > 0 {
+		d, err := time.ParseDuration(t)
+		if err != nil {
+			return fmt.Errorf("failed to parse client_pool_close_timeout: %v", t)
+		}
+		clientOpts = append(clientOpts, client.PoolCloseTimeout(d))
 	}
 
 	// We have some command line opts for the server.
@@ -599,7 +683,72 @@ func (c *cmd) Before(ctx *cli.Context) error {
 		}
 	}
 
+	// config
+	if name := ctx.String("config"); len(name) > 0 {
+		// only change if we have the server and type differs
+		if r, ok := c.opts.Configs[name]; ok {
+			rc, err := r()
+			if err != nil {
+				logger.Fatalf("Error configuring config: %v", err)
+			}
+			*c.opts.Config = rc
+		}
+	}
 	return nil
+}
+
+func (c *cmd) setRegistry(r registry.Registry) ([]server.Option, []client.Option) {
+	var serverOpts []server.Option
+	var clientOpts []client.Option
+	*c.opts.Registry = r
+	serverOpts = append(serverOpts, server.Registry(*c.opts.Registry))
+	clientOpts = append(clientOpts, client.Registry(*c.opts.Registry))
+
+	if err := (*c.opts.Selector).Init(selector.Registry(*c.opts.Registry)); err != nil {
+		logger.Fatalf("Error configuring registry: %v", err)
+	}
+
+	clientOpts = append(clientOpts, client.Selector(*c.opts.Selector))
+
+	if err := (*c.opts.Broker).Init(broker.Registry(*c.opts.Registry)); err != nil {
+		logger.Fatalf("Error configuring broker: %v", err)
+	}
+	return serverOpts, clientOpts
+}
+func (c *cmd) setStream(s events.Stream) ([]server.Option, []client.Option) {
+	var serverOpts []server.Option
+	var clientOpts []client.Option
+	*c.opts.Stream = s
+	// TODO: do server and client need a Stream?
+	// serverOpts = append(serverOpts, server.Registry(*c.opts.Registry))
+	// clientOpts = append(clientOpts, client.Registry(*c.opts.Registry))
+
+	return serverOpts, clientOpts
+}
+
+func (c *cmd) setBroker(b broker.Broker) ([]server.Option, []client.Option) {
+	var serverOpts []server.Option
+	var clientOpts []client.Option
+	*c.opts.Broker = b
+	serverOpts = append(serverOpts, server.Broker(*c.opts.Broker))
+	clientOpts = append(clientOpts, client.Broker(*c.opts.Broker))
+	return serverOpts, clientOpts
+}
+
+func (c *cmd) setStore(s store.Store) ([]server.Option, []client.Option) {
+	var serverOpts []server.Option
+	var clientOpts []client.Option
+	*c.opts.Store = s
+	return serverOpts, clientOpts
+}
+
+func (c *cmd) setTransport(t transport.Transport) ([]server.Option, []client.Option) {
+	var serverOpts []server.Option
+	var clientOpts []client.Option
+	*c.opts.Transport = t
+	serverOpts = append(serverOpts, server.Transport(*c.opts.Transport))
+	clientOpts = append(clientOpts, client.Transport(*c.opts.Transport))
+	return serverOpts, clientOpts
 }
 
 func (c *cmd) Init(opts ...Option) error {
@@ -632,4 +781,17 @@ func Init(opts ...Option) error {
 
 func NewCmd(opts ...Option) Cmd {
 	return newCmd(opts...)
+}
+
+// Register CLI commands
+func Register(cmds ...*cli.Command) {
+	app := DefaultCmd.App()
+	app.Commands = append(app.Commands, cmds...)
+
+	// sort the commands so they're listed in order on the cli
+	// todo: move this to micro/cli so it's only run when the
+	// commands are printed during "help"
+	sort.Slice(app.Commands, func(i, j int) bool {
+		return app.Commands[i].Name < app.Commands[j].Name
+	})
 }

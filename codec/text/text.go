@@ -4,16 +4,15 @@ package text
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
-	"github.com/asim/go-micro/v3/codec"
+	"go-micro.dev/v6/codec"
 )
 
 type Codec struct {
 	Conn io.ReadWriteCloser
 }
 
-// Frame gives us the ability to define raw data to send over the pipes
+// Frame gives us the ability to define raw data to send over the pipes.
 type Frame struct {
 	Data []byte
 }
@@ -24,7 +23,7 @@ func (c *Codec) ReadHeader(m *codec.Message, t codec.MessageType) error {
 
 func (c *Codec) ReadBody(b interface{}) error {
 	// read bytes
-	buf, err := ioutil.ReadAll(c.Conn)
+	buf, err := io.ReadAll(c.Conn)
 	if err != nil {
 		return err
 	}

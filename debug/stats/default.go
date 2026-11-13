@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/asim/go-micro/v3/util/ring"
+	"go-micro.dev/v6/internal/util/ring"
 )
 
 type stats struct {
@@ -80,7 +80,7 @@ func (s *stats) Record(err error) error {
 }
 
 // NewStats returns a new in memory stats buffer
-// TODO add options
+// TODO add options.
 func NewStats() Stats {
 	return &stats{
 		started: time.Now().Unix(),

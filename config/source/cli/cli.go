@@ -2,15 +2,15 @@ package cli
 
 import (
 	"flag"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/asim/go-micro/v3/cmd"
-	"github.com/asim/go-micro/v3/config/source"
-	"github.com/imdario/mergo"
-	"github.com/micro/cli/v2"
+	"dario.cat/mergo"
+	"github.com/urfave/cli/v2"
+	"go-micro.dev/v6/cmd"
+	"go-micro.dev/v6/config/source"
 )
 
 type cliSource struct {
@@ -25,7 +25,9 @@ func (c *cliSource) Read() (*source.ChangeSet, error) {
 	for _, f := range c.ctx.App.Flags {
 		name := f.Names()[0]
 		tmp := toEntry(name, c.ctx.Generic(name))
-		mergo.Map(&changes, tmp) // need to sort error handling
+		if err := mergo.Map(&changes, tmp, mergo.WithOverride); err != nil {
+			return nil, err
+		}
 	}
 
 	b, err := c.opts.Encoder.Encode(changes)
@@ -75,7 +77,7 @@ func (c *cliSource) Watch() (source.Watcher, error) {
 	return source.NewNoopWatcher()
 }
 
-// Write is unsupported
+// Write is unsupported.
 func (c *cliSource) Write(cs *source.ChangeSet) error {
 	return nil
 }
@@ -84,19 +86,20 @@ func (c *cliSource) String() string {
 	return "cli"
 }
 
-// NewSource returns a config source for integrating parsed flags from a micro/cli.Context.
+// NewSource returns a config source for integrating parsed flags from a urfave/cli.Context.
 // Hyphens are delimiters for nesting, and all keys are lowercased. The assumption is that
 // command line flags have already been parsed.
 //
 // Example:
-//      cli.StringFlag{Name: "db-host"},
+//
+//	cli.StringFlag{Name: "db-host"},
 //
 //
-//      {
-//          "database": {
-//              "host": "localhost"
-//          }
-//      }
+//	{
+//	    "database": {
+//	        "host": "localhost"
+//	    }
+//	}
 func NewSource(opts ...source.Option) source.Source {
 	options := source.NewOptions(opts...)
 
@@ -115,15 +118,15 @@ func NewSource(opts ...source.Option) source.Source {
 
 		// apply flags to set
 		for _, f := range flags {
-			f.Apply(set)
+			_ = f.Apply(set)
 		}
 
 		// parse flags
-		set.SetOutput(ioutil.Discard)
-		set.Parse(os.Args[1:])
+		set.SetOutput(io.Discard)
+		_ = set.Parse(os.Args[1:])
 
 		// normalise flags
-		normalizeFlags(app.Flags, set)
+		_ = normalizeFlags(app.Flags, set)
 
 		// create context
 		ctx = cli.NewContext(app, set, nil)

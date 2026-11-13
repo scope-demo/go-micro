@@ -4,6 +4,7 @@ package errors
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -36,87 +37,59 @@ func Parse(err string) *Error {
 	return e
 }
 
-// BadRequest generates a 400 error.
-func BadRequest(id, format string, a ...interface{}) error {
+func newError(id string, code int32, detail string, a ...interface{}) error {
+	if len(a) > 0 {
+		detail = fmt.Sprintf(detail, a...)
+	}
 	return &Error{
 		Id:     id,
-		Code:   400,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(400),
+		Code:   code,
+		Detail: detail,
+		Status: http.StatusText(int(code)),
 	}
+}
+
+// BadRequest generates a 400 error.
+func BadRequest(id, format string, a ...interface{}) error {
+	return newError(id, 400, format, a...)
 }
 
 // Unauthorized generates a 401 error.
 func Unauthorized(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   401,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(401),
-	}
+	return newError(id, 401, format, a...)
 }
 
 // Forbidden generates a 403 error.
 func Forbidden(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   403,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(403),
-	}
+	return newError(id, 403, format, a...)
 }
 
 // NotFound generates a 404 error.
 func NotFound(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   404,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(404),
-	}
+	return newError(id, 404, format, a...)
 }
 
 // MethodNotAllowed generates a 405 error.
 func MethodNotAllowed(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   405,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(405),
-	}
+	return newError(id, 405, format, a...)
 }
 
 // Timeout generates a 408 error.
 func Timeout(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   408,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(408),
-	}
+	return newError(id, 408, format, a...)
 }
 
 // Conflict generates a 409 error.
 func Conflict(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   409,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(409),
-	}
+	return newError(id, 409, format, a...)
 }
 
 // InternalServerError generates a 500 error.
 func InternalServerError(id, format string, a ...interface{}) error {
-	return &Error{
-		Id:     id,
-		Code:   500,
-		Detail: fmt.Sprintf(format, a...),
-		Status: http.StatusText(500),
-	}
+	return newError(id, 500, format, a...)
 }
 
-// Equal tries to compare errors
+// Equal tries to compare errors.
 func Equal(err1 error, err2 error) bool {
 	verr1, ok1 := err1.(*Error)
 	verr2, ok2 := err2.(*Error)
@@ -136,11 +109,82 @@ func Equal(err1 error, err2 error) bool {
 	return true
 }
 
-// FromError try to convert go error to *Error
+// FromError try to convert go error to *Error.
 func FromError(err error) *Error {
-	if verr, ok := err.(*Error); ok && verr != nil {
+	if err == nil {
+		return nil
+	}
+	if verr, ok := As(err); ok && verr != nil {
 		return verr
 	}
 
 	return Parse(err.Error())
+}
+
+// As finds the first error in err's chain that matches *Error.
+func As(err error) (*Error, bool) {
+	if err == nil {
+		return nil, false
+	}
+	var merr *Error
+	if errors.As(err, &merr) {
+		return merr, true
+	}
+	return nil, false
+}
+
+func NewMultiError() *MultiError {
+	return &MultiError{
+		Errors: make([]*Error, 0),
+	}
+}
+
+func (e *MultiError) Append(err ...*Error) {
+	e.Errors = append(e.Errors, err...)
+}
+
+func (e *MultiError) HasErrors() bool {
+	return len(e.Errors) > 0
+}
+
+func (e *MultiError) Error() string {
+	b, _ := json.Marshal(e)
+	return string(b)
+}
+
+// Stable HTTP status codes used by the structured RPC error constructors.
+const (
+	CodeAlreadyExists      int32 = http.StatusConflict
+	CodeFailedPrecondition int32 = http.StatusPreconditionFailed
+	CodeResourceExhausted  int32 = http.StatusTooManyRequests
+	CodeUnavailable        int32 = http.StatusServiceUnavailable
+)
+
+// AlreadyExists generates a 409 error, equivalent to Conflict.
+func AlreadyExists(id, format string, a ...interface{}) error {
+	return newError(id, CodeAlreadyExists, format, a...)
+}
+
+// FailedPrecondition generates a 412 error.
+func FailedPrecondition(id, format string, a ...interface{}) error {
+	return newError(id, CodeFailedPrecondition, format, a...)
+}
+
+// ResourceExhausted generates a 429 error.
+func ResourceExhausted(id, format string, a ...interface{}) error {
+	return newError(id, CodeResourceExhausted, format, a...)
+}
+
+// Unavailable generates a 503 error.
+func Unavailable(id, format string, a ...interface{}) error {
+	return newError(id, CodeUnavailable, format, a...)
+}
+
+// Is compares status codes and any nonempty Reason/Domain on the target.
+// IDs and human-readable details do not participate, so a remote error can
+// match a local sentinel after transport serialization.
+func (e *Error) Is(target error) bool {
+	other, ok := target.(*Error)
+	return ok && e != nil && other != nil && e.Code != 0 && e.Code == other.Code &&
+		(other.Reason == "" || e.Reason == other.Reason) && (other.Domain == "" || e.Domain == other.Domain)
 }

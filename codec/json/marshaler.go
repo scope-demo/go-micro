@@ -1,36 +1,27 @@
 package json
 
 import (
-	"bytes"
 	"encoding/json"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
-	"github.com/oxtoacart/bpool"
+	"google.golang.org/protobuf/proto"
 )
 
-var jsonpbMarshaler = &jsonpb.Marshaler{}
-
-// create buffer pool with 16 instances each preallocated with 256 bytes
-var bufferPool = bpool.NewSizedBufferPool(16, 256)
-
-type Marshaler struct{}
+type Marshaler struct{ Options Options }
 
 func (j Marshaler) Marshal(v interface{}) ([]byte, error) {
 	if pb, ok := v.(proto.Message); ok {
-		buf := bufferPool.Get()
-		defer bufferPool.Put(buf)
-		if err := jsonpbMarshaler.Marshal(buf, pb); err != nil {
-			return nil, err
+		data, err := j.Options.MarshalOptions.Marshal(pb)
+		if err != nil || !j.Options.Int64AsNumber {
+			return data, err
 		}
-		return buf.Bytes(), nil
+		return j.Options.numericIntegers(data, pb.ProtoReflect().Descriptor())
 	}
 	return json.Marshal(v)
 }
 
 func (j Marshaler) Unmarshal(d []byte, v interface{}) error {
 	if pb, ok := v.(proto.Message); ok {
-		return jsonpb.Unmarshal(bytes.NewReader(d), pb)
+		return j.Options.UnmarshalOptions.Unmarshal(d, pb)
 	}
 	return json.Unmarshal(d, v)
 }

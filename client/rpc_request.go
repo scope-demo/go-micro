@@ -1,17 +1,17 @@
 package client
 
 import (
-	"github.com/asim/go-micro/v3/codec"
+	"go-micro.dev/v6/codec"
 )
 
 type rpcRequest struct {
+	opts        RequestOptions
+	codec       codec.Codec
+	body        interface{}
 	service     string
 	method      string
 	endpoint    string
 	contentType string
-	codec       codec.Codec
-	body        interface{}
-	opts        RequestOptions
 }
 
 func newRequest(service, endpoint string, request interface{}, contentType string, reqOpts ...RequestOption) Request {

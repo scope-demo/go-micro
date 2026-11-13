@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/asim/go-micro/v3/registry"
+	"go-micro.dev/v6/registry"
 )
 
 type testHandler struct{}
@@ -61,5 +61,4 @@ func TestExtractEndpoint(t *testing.T) {
 	if endpoints[0].Response.Type != "testResponse" {
 		t.Errorf("Expected testResponse type got %s", endpoints[0].Response.Type)
 	}
-
 }

@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/asim/go-micro/v3/metadata"
+	"go-micro.dev/v6/metadata"
+	"go-micro.dev/v6/transport/headers"
 )
 
 func TestCache(t *testing.T) {
@@ -65,7 +66,7 @@ func TestCacheKey(t *testing.T) {
 	})
 
 	t.Run("DifferentMetadata", func(t *testing.T) {
-		mdCtx := metadata.Set(context.TODO(), "Micro-Namespace", "bar")
+		mdCtx := metadata.Set(context.TODO(), headers.Namespace, "bar")
 		key1 := key(mdCtx, &req1)
 		key2 := key(ctx, &req1)
 

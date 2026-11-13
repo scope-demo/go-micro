@@ -4,27 +4,27 @@ package reader
 import (
 	"time"
 
-	"github.com/asim/go-micro/v3/config/source"
+	"go-micro.dev/v6/config/source"
 )
 
-// Reader is an interface for merging changesets
+// Reader is an interface for merging changesets.
 type Reader interface {
 	Merge(...*source.ChangeSet) (*source.ChangeSet, error)
 	Values(*source.ChangeSet) (Values, error)
 	String() string
 }
 
-// Values is returned by the reader
+// Values is returned by the reader.
 type Values interface {
 	Bytes() []byte
-	Get(path ...string) Value
+	Get(path ...string) (Value, error)
 	Set(val interface{}, path ...string)
 	Del(path ...string)
 	Map() map[string]interface{}
 	Scan(v interface{}) error
 }
 
-// Value represents a value of any type
+// Value represents a value of any type.
 type Value interface {
 	Bool(def bool) bool
 	Int(def int) int

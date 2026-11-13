@@ -4,11 +4,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/asim/go-micro/v3/config/encoder"
-	"github.com/asim/go-micro/v3/config/encoder/json"
-	"github.com/asim/go-micro/v3/config/reader"
-	"github.com/asim/go-micro/v3/config/source"
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
+	"go-micro.dev/v6/config/encoder"
+	"go-micro.dev/v6/config/encoder/json"
+	"go-micro.dev/v6/config/reader"
+	"go-micro.dev/v6/config/source"
 )
 
 type jsonReader struct {
@@ -73,7 +73,7 @@ func (j *jsonReader) String() string {
 	return "json"
 }
 
-// NewReader creates a json reader
+// NewReader creates a json reader.
 func NewReader(opts ...reader.Option) reader.Reader {
 	options := reader.NewOptions(opts...)
 	return &jsonReader{

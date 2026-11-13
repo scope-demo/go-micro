@@ -3,10 +3,11 @@ package flag
 import (
 	"errors"
 	"flag"
-	"github.com/asim/go-micro/v3/config/source"
-	"github.com/imdario/mergo"
 	"strings"
 	"time"
+
+	"dario.cat/mergo"
+	"go-micro.dev/v6/config/source"
 )
 
 type flagsrc struct {
@@ -35,8 +36,7 @@ func (fs *flagsrc) Read() (*source.ChangeSet, error) {
 			tmp = map[string]interface{}{k: tmp}
 		}
 
-		mergo.Map(&changes, tmp) // need to sort error handling
-		return
+		_ = mergo.Map(&changes, tmp) // need to sort error handling
 	}
 
 	unset, ok := fs.opts.Context.Value(includeUnsetKey{}).(bool)
@@ -89,13 +89,14 @@ func (fs *flagsrc) String() string {
 // Hyphens are delimiters for nesting, and all keys are lowercased.
 //
 // Example:
-//      dbhost := flag.String("database-host", "localhost", "the db host name")
 //
-//      {
-//          "database": {
-//              "host": "localhost"
-//          }
-//      }
+//	dbhost := flag.String("database-host", "localhost", "the db host name")
+//
+//	{
+//	    "database": {
+//	        "host": "localhost"
+//	    }
+//	}
 func NewSource(opts ...source.Option) source.Source {
 	return &flagsrc{opts: source.NewOptions(opts...)}
 }

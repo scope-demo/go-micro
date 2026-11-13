@@ -3,25 +3,24 @@ package log
 import (
 	"sync"
 
-	"github.com/asim/go-micro/v3/util/ring"
 	"github.com/google/uuid"
+	"go-micro.dev/v6/internal/util/ring"
 )
 
-// Should stream from OS
+// Should stream from OS.
 type osLog struct {
 	format FormatFunc
-	once   sync.Once
-
-	sync.RWMutex
 	buffer *ring.Buffer
 	subs   map[string]*osStream
+
+	sync.RWMutex
 }
 
 type osStream struct {
 	stream chan Record
 }
 
-// Read reads log entries from the logger
+// Read reads log entries from the logger.
 func (o *osLog) Read(...ReadOption) ([]Record, error) {
 	var records []Record
 
@@ -33,13 +32,13 @@ func (o *osLog) Read(...ReadOption) ([]Record, error) {
 	return records, nil
 }
 
-// Write writes records to log
+// Write writes records to log.
 func (o *osLog) Write(r Record) error {
 	o.buffer.Put(r)
 	return nil
 }
 
-// Stream log records
+// Stream log records.
 func (o *osLog) Stream() (Stream, error) {
 	o.Lock()
 	defer o.Unlock()

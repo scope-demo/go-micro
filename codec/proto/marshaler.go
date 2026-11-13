@@ -3,12 +3,12 @@ package proto
 import (
 	"bytes"
 
-	"github.com/asim/go-micro/v3/codec"
 	"github.com/golang/protobuf/proto"
 	"github.com/oxtoacart/bpool"
+	"go-micro.dev/v6/codec"
 )
 
-// create buffer pool with 16 instances each preallocated with 256 bytes
+// create buffer pool with 16 instances each preallocated with 256 bytes.
 var bufferPool = bpool.NewSizedBufferPool(16, 256)
 
 type Marshaler struct{}

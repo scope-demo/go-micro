@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/asim/go-micro/v3/transport"
+	"go-micro.dev/v6/transport"
 )
 
 func TestCallOptions(t *testing.T) {
@@ -78,8 +78,6 @@ func TestCallOptions(t *testing.T) {
 			if e := o.CallOptions.DialTimeout * (time.Second * 10); callOpts.DialTimeout != e {
 				t.Fatalf("Expected %v got %v", e, callOpts.DialTimeout)
 			}
-
 		}
-
 	}
 }

@@ -1,14 +1,14 @@
 package mock
 
 import (
-	"github.com/asim/go-micro/v3/registry"
-	"github.com/asim/go-micro/v3/server"
+	"go-micro.dev/v6/registry"
+	"go-micro.dev/v6/server"
 )
 
 type MockSubscriber struct {
-	Id   string
 	Opts server.SubscriberOptions
 	Sub  interface{}
+	Id   string
 }
 
 func (m *MockSubscriber) Topic() string {

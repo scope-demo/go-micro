@@ -3,17 +3,18 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"io"
 	"time"
 
-	"github.com/asim/go-micro/v3/client"
-	"github.com/asim/go-micro/v3/debug/log"
-	proto "github.com/asim/go-micro/v3/debug/proto"
-	"github.com/asim/go-micro/v3/debug/stats"
-	"github.com/asim/go-micro/v3/debug/trace"
-	"github.com/asim/go-micro/v3/server"
+	"go-micro.dev/v6/client"
+	"go-micro.dev/v6/debug/log"
+	proto "go-micro.dev/v6/debug/proto"
+	"go-micro.dev/v6/debug/stats"
+	"go-micro.dev/v6/debug/trace"
 )
 
-// NewHandler returns an instance of the Debug Handler
+// NewHandler returns an instance of the Debug Handler.
 func NewHandler(c client.Client) *Debug {
 	return &Debug{
 		log:   log.DefaultLog,
@@ -22,8 +23,10 @@ func NewHandler(c client.Client) *Debug {
 	}
 }
 
+var _ proto.DebugHandler = (*Debug)(nil)
+
 type Debug struct {
-	// must honour the debug handler
+	// must honor the debug handler
 	proto.DebugHandler
 	// the logger for retrieving logs
 	log log.Log
@@ -36,6 +39,25 @@ type Debug struct {
 func (d *Debug) Health(ctx context.Context, req *proto.HealthRequest, rsp *proto.HealthResponse) error {
 	rsp.Status = "ok"
 	return nil
+}
+
+func (d *Debug) MessageBus(ctx context.Context, stream proto.Debug_MessageBusStream) error {
+	for {
+		_, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		rsp := proto.BusMsg{
+			Msg: "Request received!",
+		}
+
+		if err := stream.Send(&rsp); err != nil {
+			return err
+		}
+	}
 }
 
 func (d *Debug) Stats(ctx context.Context, req *proto.StatsRequest, rsp *proto.StatsResponse) error {
@@ -69,12 +91,14 @@ func (d *Debug) Trace(ctx context.Context, req *proto.TraceRequest, rsp *proto.T
 
 	for _, t := range traces {
 		var typ proto.SpanType
+
 		switch t.Type {
 		case trace.SpanTypeRequestInbound:
 			typ = proto.SpanType_INBOUND
 		case trace.SpanTypeRequestOutbound:
 			typ = proto.SpanType_OUTBOUND
 		}
+
 		rsp.Spans = append(rsp.Spans, &proto.Span{
 			Trace:    t.Trace,
 			Id:       t.Id,
@@ -90,11 +114,7 @@ func (d *Debug) Trace(ctx context.Context, req *proto.TraceRequest, rsp *proto.T
 	return nil
 }
 
-func (d *Debug) Log(ctx context.Context, stream server.Stream) error {
-	req := new(proto.LogRequest)
-	if err := stream.Recv(req); err != nil {
-		return err
-	}
+func (d *Debug) Log(ctx context.Context, req *proto.LogRequest, stream proto.Debug_LogStream) error {
 
 	var options []log.ReadOption
 
@@ -118,7 +138,7 @@ func (d *Debug) Log(ctx context.Context, stream server.Stream) error {
 		if err != nil {
 			return err
 		}
-		defer lgStream.Stop()
+		defer func() { _ = lgStream.Stop() }()
 
 		for record := range lgStream.Chan() {
 			// copy metadata

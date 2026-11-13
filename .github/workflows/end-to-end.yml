@@ -1,0 +1,29 @@
+name: End-to-end tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  end-to-end:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build all packages
+        run: go build ./...
+      - name: Test CLI journeys, agents, recovery and providers
+        run: make harness
+      - name: Install NATS for service tests
+        run: go install github.com/nats-io/nats-server/v2@v2.11.3
+      - name: Test services, gateway and MCP
+        run: make service-smoke

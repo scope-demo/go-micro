@@ -5,11 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/asim/go-micro/v3/codec"
-	"github.com/asim/go-micro/v3/transport"
+	"go-micro.dev/v6/codec"
+	"go-micro.dev/v6/transport"
 )
 
-// testCodec is a dummy codec that only knows how to encode nil bodies
+// testCodec is a dummy codec that only knows how to encode nil bodies.
 type testCodec struct {
 	buf *bytes.Buffer
 }

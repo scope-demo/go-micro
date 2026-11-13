@@ -33,7 +33,7 @@ func TestMemoryTransport(t *testing.T) {
 				}
 			}
 		}); err != nil {
-			t.Fatalf("Unexpected error accepting %v", err)
+			t.Errorf("Unexpected error accepting %v", err)
 		}
 	}()
 
@@ -59,7 +59,6 @@ func TestMemoryTransport(t *testing.T) {
 			t.Logf("Client Received %s", string(m.Body))
 		}
 	}
-
 }
 
 func TestListener(t *testing.T) {
